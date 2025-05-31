@@ -96,6 +96,7 @@ Average Query Length: 46.6200
 I ran my code with multiple max_fewshot_examples values [0, 1, 5, 10]. 1 came closest to the required values and hits as many metrics within ±5% of the README’s numbers as possible. However 5 captues more relevant resumes since it achieves Recall@300 = 0.3747 and Recall@1000 = 0.4736 (both slightly better than reference) at the expense of higher nDCG.
 
 When running with max_fewshot_examples = 1
+```bash
 Final Results:
 Model: local/Qwen/Qwen2.5-7B-Instruct
 Number of jobs: 50
@@ -115,8 +116,10 @@ NDCG1@all: 0.2091
 Average Retrieval Number of Resumes: 1446.3200
 Average Query Length: 51.0200
 Evaluation complete. Results saved to ./results
+```
 
 When running with max_fewshot_prompting_examples = 5
+```
 Final Results:
 Model: local/Qwen/Qwen2.5-7B-Instruct
 Number of jobs: 50
@@ -136,8 +139,10 @@ NDCG1@all: 0.2236
 Average Retrieval Number of Resumes: 1382.6800
 Average Query Length: 50.5400
 Evaluation complete. Results saved to ./results
+```
 
 When running with max_fewshot_examples = 0
+```bash
 Final Results:
 Model: local/Qwen/Qwen2.5-7B-Instruct
 Number of jobs: 50
@@ -157,8 +162,10 @@ NDCG1@all: 0.2091
 Average Retrieval Number of Resumes: 1446.3200
 Average Query Length: 51.0200
 Evaluation complete. Results saved to ./results
+```
 
 When running with max_fewshot_prompting_examples = 10
+```bash
 Final Results:
 Model: local/Qwen/Qwen2.5-7B-Instruct
 Number of jobs: 50
@@ -178,6 +185,7 @@ NDCG1@all: 0.1869
 Average Retrieval Number of Resumes: 1146.8400
 Average Query Length: 48.6800
 Evaluation complete. Results saved to ./results
+```
 
 #### 2. We used few-shot prompting in this assignment. Is it necessary? What if we use zero-shot prompting?
 
