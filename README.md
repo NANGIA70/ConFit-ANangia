@@ -188,18 +188,88 @@ Evaluation complete. Results saved to ./results
 ```
 
 #### 2. We used few-shot prompting in this assignment. Is it necessary? What if we use zero-shot prompting?
+With few-shot prompting, the model is given concrete examples that demonstrate exactly how to map a job description into the required JSON schema (e.g., which keys to include, how to format boolean skill strings, how to constrain year-of-work). These examples effectively prime the LLM’s internal in-context learning mechanism, its transformer layers internally mimic “learning” from those demonstrations and so it replicates the demonstrated pattern when faced with a new job description. As a result, few-shot prompting yields more stable, complete, and domain-aligned outputs, especially for niche or long tail roles where zero-shot instructions alone might miss rare features or omit required fields. In practice, a small handful of well-chosen examples suffices to anchor the model’s behavior, after which additional examples produce diminishing returns and can even introduce conflicting signals or exhaust the context window.
 
+Without few-shot prompting, the LLM relies entirely on abstract instructions to perform the task, which can lead to higher variance in output format and content relevance. In the context of job-to-resume matching, we require precise, structured JSON fields (e.g., “title,” “location,” “skills,” “yearOfWork”) to convert into Elasticsearch queries. Zero-shot prompting often fails to enforce that exact schema: the model may omit critical fields like “industryKeywords,” misformat boolean expressions, or misunderstand which details are essential for matching. Furthermore, job descriptions frequently contain domain-specific jargon, acronyms, or long, multi-paragraph requirements that zero-shot alone might not correctly interpret. As a result, keyword extraction under zero-shot can be inconsistent, sometimes producing free-text prose rather than strictly formatted JSON, and miss important terms that drive recall. This output instability and potential omission of relevant attributes make zero-shot prompting unsuitable for our pipeline, because any formatting or content inconsistency directly translates into ineffective Elasticsearch queries and lower end-to-end retrieval performance.
 
 #### 3. What does `nDCG` and `Recall` measure? Why are we using them in this case?
+Recall
+Recall measures the proportion of all truly relevant resumes that our system successfully retrieves. Intuitively, it answers “out of every resume that should match a given job description, how many do we actually surface?” A high recall means that most of the ground-truth matches appear somewhere in our retrieved list. In the context of job-to-résumé matching, we care about recall because hiring managers want confidence that the system is not overlooking qualified candidates: if a candidate is labeled as a good fit, we want them to appear among the top results rather than being buried or omitted entirely.
 
+We use recall in this assignment to quantify coverage: by checking how many known “satisfied” user-IDs fall within our retrieved shortlist, we directly measure whether our keyword extraction and query building steps are capturing all of the correct candidates. A low recall would indicate that our generated keywords or ES query are too narrow (filtering out good resumes), whereas a high recall shows that relevant resumes—across a variety of titles, locations, skills, and experience levels—are being included. In short, recall ensures we do not miss qualified matches, which is fundamental when the goal is to recommend as many appropriate resumes as possible for each job description.
+
+nDCG (Normalized Discounted Cumulative Gain)
+nDCG assesses not only whether relevant resumes are retrieved, but also how they are ranked relative to each other: it discounts correct matches that appear deeper in the results list. Intuitively, if two systems both find the same set of relevant resumes, the one that positions its best matches higher in the ranking will have a higher nDCG score. In a job-to-résumé pipeline, ranking matters because recruiters will typically review the first page or first few dozen candidates; surfacing top matches earlier reduces time spent scrolling through less-relevant profiles.
+
+We employ nDCG as a complement to recall because it captures ranking quality. Even if our system’s recall is high, poor ranking could force a recruiter to sift through many borderline matches before finding the ideal candidate. By measuring how quickly (i.e., at which ranks) true matches appear, nDCG tells us whether our Elasticsearch queries not only include the right resumes but also prioritize the strongest fits. This is crucial in practice: even a slight improvement in ranking can save hours of manual review, so optimizing for nDCG ensures that high-value candidates appear at the top of the retrieval list.
 
 #### 4. What does the `@xxx` mean in the metrics? Why are `Recall@1000`/`nDCG1@1000` scores almost always higher than`Recall@300`/`nDCG1@300`?
+The “@xxx” suffix indicates a cutoff on the rank list. For example, Recall@300 measures recall over only the top 300 retrieved resumes, i.e., “Of all relevant resumes, how many appear somewhere in the first 300?” Similarly, nDCG1@300 means we compute nDCG considering only the top 300 ranks but focus on the gain at rank 1, then normalize by the ideal DCG₁ given up to 300 candidates.
 
+Because expanding the cutoff can only add more relevant items, Recall@1000 is always at least as large as Recall@300. Any relevant resume that would have appeared in positions 301–1000 will now count toward Recall@1000. Likewise, with nDCG1@1000 you allow relevant resumes to appear anywhere in the top 1000, so the normalized gain at rank 1 can only stay the same or improve when K increases, making nDCG1@1000 ≥ nDCG1@300.
 
 #### 5. We used `Qwen/Qwen2.5-7B-Instruct` in this assignment. How do you expect the performance to change if I used a) `Qwen/Qwen2.5-3B-Instruct`; or b) `Qwen/Qwen2.5-32B-Instruct`?
+**Qwen2.5-3B-Instruct (3 B Parameters)**
+**Pros**
+- **Lower Inference Cost**  
+  Requires significantly less GPU/CPU memory and compute, enabling faster batch throughput and cheaper deployment.
+- **Adequate for Common Patterns**  
+  Retains basic schema-extraction abilities; with `temperature=0` and clean few-shot examples, it can still produce structurally correct JSON.
+**Cons**
+- **Limited Capacity**  
+  Fewer parameters reduce its ability to capture nuanced keyword relationships, risking omissions of less common titles or skills and lowering Recall@K.
+- **Formatting Instability**  
+  Higher variance in JSON output; more frequent parse errors or missing fields unless prompt engineering is exceptionally precise.
+
+**Qwen2.5-32B-Instruct (32 B Parameters)**
+**Pros**
+- **Superior Generalization**  
+  Greater parameter count yields more faithful adherence to few-shot examples, improving extraction of domain-specific terms and raising both Recall@K and nDCG@K.
+- **Robust Formatting**  
+  Consistently produces valid JSON with minimal postprocessing, reducing skipped queries and improving end-to-end reliability.
+**Cons**
+- **High Inference Cost**  
+  Requires substantially more GPU/CPU resources and suffers increased latency, which may be impractical for large-scale or real-time pipelines.
+- **Diminishing Returns**  
+  Performance gains over the 7 B model are modest (often a few percentage points), making the extra compute overhead potentially unjustifiable for incremental recall improvements.
 
 
 #### 6. Directly prompting an untrained LLM does not yield the best performance. What are some ways to train the LLM to improve the performance? List **at most two methods** you can think of that can best improve the model performance.
+**Method A: Supervised Fine-Tuning of the LLM for Keyword Extraction**  
+**What it is**  
+- Fine-tune the base LLM on a curated set of (job description → “ideal” keyword JSON) pairs so that at inference it generates well-formatted, high-quality queries.
+
+**Pros**  
+- **Directly learns the precise JSON schema and domain vocabulary.**  Improves keyword relevance and reduces formatting errors.  
+- **Reduces formatting errors.**  Model adherence to a fixed schema minimizes postprocessing and parse failures.
+
+**Cons**  
+- **Requires extensive labeled examples.**  Need to assemble or label many JD→keyword pairs to cover domain diversity.  
+- **High compute cost.**  Fine-tuning a 7B-parameter model incurs substantial GPU/CPU usage and longer iteration cycles.
+
+**Pipeline (high level)**  
+- **Prepare JD→Keyword Data**  Collect “best” keyword JSON for each job description (e.g., from `mapped_best_keywords.jsonl` plus any expanded, manually labeled pairs).  
+- **Fine-Tune LLM**  Train Qwen2.5-7B-Instruct (or a similar base) to map each JD to its target JSON.  
+- **Replace Keyword Step**  At runtime, `generate_search_keywords_openai` calls the fine-tuned model instead of the base.  
+- **Build ES Query & Retrieve**  Use `build_es_query_from_dict` and `run_elasticsearch_query` exactly as before to fetch candidate resumes.
+
+**Method B: Two-Stage Retrieval with Bi-Encoder Re-Ranking**  
+**What it is**  
+- Use the existing LLM→ES step to get a high recall candidate set, then re-rank that shortlist via a separately trained bi-encoder on JD-resume satisfaction labels.
+
+**Pros**  
+- **Captures fine-grained semantic similarity.**  Bi-encoder training on JD/resume pairs boosts precision by learning nuanced embeddings.  
+- **Scalable retrieval pipeline.**  Elasticsearch narrows down to top K (e.g., 1000), then bi-encoder re-ranks only a small subset (e.g., 200), preserving throughput.
+
+**Cons**  
+- **Additional model maintenance.**  Requires training, serving, and monitoring a separate bi-encoder model alongside the LLM.  
+- **Inference overhead.**  Encoding K resumes and the JD for every query adds latency and compute compared to a single‐stage search.
+
+**Pipeline (high level)**  
+- **Train Bi-Encoder**  Use labeled triples (JD_ID, Resume_ID, satisfaction label) and train with contrastive or ranking loss, incorporating hard negatives.  
+- **Stage 1 – LLM→ES**  Generate keywords from JD, convert them into an ES query, and retrieve the top 1000 resumes.  
+- **Stage 2 – Bi-Encoder Re-Rank**  Encode the JD and top K (e.g., 200) resumes using the bi-encoder, compute cosine similarities, and sort by score.  
+- **Output & Feedback**  Return the final ranked list of resumes; optionally mine hard negatives from re-ranking mistakes for subsequent bi-encoder retraining.  
 
 
 # Submission
