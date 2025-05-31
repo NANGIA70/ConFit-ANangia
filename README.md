@@ -236,8 +236,7 @@ Because expanding the cutoff can only add more relevant items, Recall@1000 is al
 
 #### 6. Directly prompting an untrained LLM does not yield the best performance. What are some ways to train the LLM to improve the performance? List **at most two methods** you can think of that can best improve the model performance.
 **Method A: Supervised Fine-Tuning of the LLM for Keyword Extraction**  
-**What it is**  
-- Fine-tune the base LLM on a curated set of (job description → “ideal” keyword JSON) pairs so that at inference it generates well-formatted, high-quality queries.
+**What it is: ** Fine-tune the base LLM on a curated set of (job description → “ideal” keyword JSON) pairs so that at inference it generates well-formatted, high-quality queries.
 
 **Pros**  
 - **Directly learns the precise JSON schema and domain vocabulary.**  Improves keyword relevance and reduces formatting errors.  
@@ -254,8 +253,7 @@ Because expanding the cutoff can only add more relevant items, Recall@1000 is al
 - **Build ES Query & Retrieve**  Use `build_es_query_from_dict` and `run_elasticsearch_query` exactly as before to fetch candidate resumes.
 
 **Method B: Two-Stage Retrieval with Bi-Encoder Re-Ranking**  
-**What it is**  
-- Use the existing LLM→ES step to get a high recall candidate set, then re-rank that shortlist via a separately trained bi-encoder on JD-resume satisfaction labels.
+**What it is: ** Use the existing LLM→ES step to get a high recall candidate set, then re-rank that shortlist via a separately trained bi-encoder on JD-resume satisfaction labels.
 
 **Pros**  
 - **Captures fine-grained semantic similarity.**  Bi-encoder training on JD/resume pairs boosts precision by learning nuanced embeddings.  
