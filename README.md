@@ -268,12 +268,4 @@ Because expanding the cutoff can only add more relevant items, Recall@1000 is al
 - **Stage 1 – LLM→ES**  Generate keywords from JD, convert them into an ES query, and retrieve the top 1000 resumes.  
 - **Stage 2 – Bi-Encoder Re-Rank**  Encode the JD and top K (e.g., 200) resumes using the bi-encoder, compute cosine similarities, and sort by score.  
 - **Output & Feedback**  Return the final ranked list of resumes; optionally mine hard negatives from re-ranking mistakes for subsequent bi-encoder retraining.  
-
-
-# Submission
-
-Upload the entire directory with your completed code (but **without the `dataset` folder**) as a **private** github repo, and share with `jasonyux` (my GitHub id). The repository should contain:
-
-- your implementation of `test.py`
-- README.md updated with your answers.
 # ConFit-ANangia
